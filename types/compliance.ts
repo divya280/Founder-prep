@@ -8,7 +8,20 @@ export interface ComplianceItem {
   how_to_apply: string | null;
   mandatory: boolean;
   domain_specific: boolean;
+  penalty: string | null;
+  deadline_note: string | null;
   created_at: string;
+}
+
+/**
+ * A checklist row as rendered in the UI: the founder's per-item status joined
+ * with the descriptive fields from compliance_items.
+ */
+export interface ChecklistEntry {
+  userComplianceId: string;
+  status: ComplianceStatus;
+  deadline: string | null;
+  item: ComplianceItem;
 }
 
 export interface UserCompliance {

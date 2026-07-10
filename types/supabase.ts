@@ -58,6 +58,8 @@ export interface Database {
           how_to_apply: string | null;
           mandatory: boolean;
           domain_specific: boolean;
+          penalty: string | null;
+          deadline_note: string | null;
           created_at: string;
         };
         Insert: {
@@ -68,6 +70,8 @@ export interface Database {
           how_to_apply?: string | null;
           mandatory?: boolean;
           domain_specific?: boolean;
+          penalty?: string | null;
+          deadline_note?: string | null;
           created_at?: string;
         };
         Update: {
@@ -78,6 +82,8 @@ export interface Database {
           how_to_apply?: string | null;
           mandatory?: boolean;
           domain_specific?: boolean;
+          penalty?: string | null;
+          deadline_note?: string | null;
           created_at?: string;
         };
         Relationships: [];

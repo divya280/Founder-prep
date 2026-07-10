@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
+import { ChecklistView } from "@/components/compliance/ChecklistView";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -77,8 +78,8 @@ export default async function DashboardPage() {
             Welcome, {displayName}
           </h1>
           <p className="mt-4 max-w-xl text-lg leading-8 text-[#526057]">
-            You are signed in as {user.email}. Your personalized compliance
-            roadmap will be generated from this profile in the next milestone.
+            You are signed in as {user.email}. Generate your personalized
+            compliance roadmap below, grounded in official Indian sources.
           </p>
 
           <div className="mt-10 border border-[#d9ded4] bg-white p-6 shadow-sm">
@@ -107,6 +108,8 @@ export default async function DashboardPage() {
               ))}
             </dl>
           </div>
+
+          <ChecklistView />
         </div>
       </section>
     </main>
