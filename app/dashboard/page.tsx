@@ -67,7 +67,15 @@ export default async function DashboardPage() {
           <span className="text-lg font-semibold tracking-wide">
             FounderPrep
           </span>
-          <LogoutButton />
+          <div className="flex items-center gap-4">
+            <Link
+              href="/assistant"
+              className="text-sm font-medium text-[#427a5b] hover:underline"
+            >
+              AI Assistant
+            </Link>
+            <LogoutButton />
+          </div>
         </header>
 
         <div className="py-14">
