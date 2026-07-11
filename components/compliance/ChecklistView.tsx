@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChecklistEntry, ComplianceStatus } from "@/types/compliance";
+import { urgencyOf, daysUntil, URGENCY_STYLES } from "@/lib/compliance/deadlines";
 
 const STATUSES: ComplianceStatus[] = ["Not Started", "In Progress", "Done"];
 
@@ -80,6 +81,31 @@ export function ChecklistView() {
       } catch {
         setEntries(prev); // revert
         setError("Could not update status. Please try again.");
+      }
+    },
+    [entries],
+  );
+
+  const updateDeadline = useCallback(
+    async (id: string, deadline: string | null) => {
+      const prev = entries;
+      setEntries((cur) =>
+        cur
+          ? cur.map((e) =>
+              e.userComplianceId === id ? { ...e, deadline } : e,
+            )
+          : cur,
+      );
+      try {
+        const res = await fetch(`/api/compliance/${id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ deadline }),
+        });
+        if (!res.ok) throw new Error();
+      } catch {
+        setEntries(prev);
+        setError("Could not update deadline. Please try again.");
       }
     },
     [entries],
@@ -184,6 +210,7 @@ export function ChecklistView() {
             key={entry.userComplianceId}
             entry={entry}
             onStatusChange={updateStatus}
+            onDeadlineChange={updateDeadline}
           />
         ))}
       </div>
@@ -198,11 +225,15 @@ export function ChecklistView() {
 function ChecklistCard({
   entry,
   onStatusChange,
+  onDeadlineChange,
 }: {
   entry: ChecklistEntry;
   onStatusChange: (id: string, status: ComplianceStatus) => void;
+  onDeadlineChange: (id: string, deadline: string | null) => void;
 }) {
-  const { item, status } = entry;
+  const { item, status, deadline } = entry;
+  const urgency = deadline ? urgencyOf(deadline) : null;
+  const days = deadline ? daysUntil(deadline) : null;
   return (
     <article className="border border-[#d9ded4] bg-white p-5 shadow-sm">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -242,12 +273,40 @@ function ChecklistCard({
         <p className="mt-3 text-sm leading-6 text-[#3d4842]">{item.description}</p>
       ) : null}
 
+      {/* Deadline editor */}
+      <div className="mt-4 flex flex-wrap items-center gap-3">
+        <label
+          className="text-xs font-semibold uppercase tracking-wide text-[#8a978c]"
+          htmlFor={`deadline-${entry.userComplianceId}`}
+        >
+          Deadline
+        </label>
+        <input
+          id={`deadline-${entry.userComplianceId}`}
+          type="date"
+          value={deadline ?? ""}
+          onChange={(e) =>
+            onDeadlineChange(entry.userComplianceId, e.target.value || null)
+          }
+          className="border border-[#d9ded4] bg-white px-2.5 py-1.5 text-xs outline-none focus:border-[#427a5b] focus:ring-1 focus:ring-[#427a5b]"
+        />
+        {deadline && urgency && days !== null && status !== "Done" ? (
+          <span className={`border px-2 py-0.5 text-[11px] font-medium ${URGENCY_STYLES[urgency]}`}>
+            {days < 0
+              ? `${Math.abs(days)}d overdue`
+              : days === 0
+                ? "due today"
+                : `in ${days}d`}
+          </span>
+        ) : null}
+      </div>
+
       <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
         {item.how_to_apply ? (
           <Field label="How to apply" value={item.how_to_apply} />
         ) : null}
         {item.deadline_note ? (
-          <Field label="Deadline" value={item.deadline_note} />
+          <Field label="Typical timeframe" value={item.deadline_note} />
         ) : null}
         {item.penalty ? <Field label="Penalty" value={item.penalty} /> : null}
       </dl>

@@ -7,6 +7,7 @@ import {
   buildComplianceQuery,
 } from "@/lib/compliance/query";
 import { generateChecklist } from "@/lib/compliance/generate";
+import { suggestDeadline } from "@/lib/compliance/deadlines";
 import { CHECKLIST_CONTEXT_CHUNKS } from "@/lib/groq/config";
 import type { ChecklistEntry, ComplianceItem, ComplianceStatus } from "@/types/compliance";
 import type { UserProfile } from "@/types/user";
@@ -162,6 +163,22 @@ export async function POST() {
     if (linkError) {
       throw new Error(`Linking checklist failed: ${linkError.message}`);
     }
+
+    // Suggest a target deadline per item, filling only blanks so a founder's
+    // manually-set or previously-suggested dates are never overwritten.
+    const itemByName = new Map(generated.items.map((it) => [it.name, it]));
+    await Promise.all(
+      upserted.map((row) => {
+        const item = itemByName.get(row.name);
+        if (!item) return Promise.resolve();
+        return admin
+          .from("user_compliance")
+          .update({ deadline: suggestDeadline(item) })
+          .eq("user_id", user.id)
+          .eq("compliance_item_id", row.id)
+          .is("deadline", null);
+      }),
+    );
 
     const checklist = await loadChecklist(admin, user.id);
     return NextResponse.json({

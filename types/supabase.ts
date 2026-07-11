@@ -150,28 +150,64 @@ export interface Database {
           id: string;
           user_id: string;
           file_name: string;
-          file_url: string;
+          file_url: string | null;
+          storage_path: string | null;
           doc_type: string | null;
+          issue_date: string | null;
           expiry_date: string | null;
+          file_size: number | null;
+          mime_type: string | null;
           uploaded_at: string;
         };
         Insert: {
           id?: string;
           user_id: string;
           file_name: string;
-          file_url: string;
+          file_url?: string | null;
+          storage_path?: string | null;
           doc_type?: string | null;
+          issue_date?: string | null;
           expiry_date?: string | null;
+          file_size?: number | null;
+          mime_type?: string | null;
           uploaded_at?: string;
         };
         Update: {
           id?: string;
           user_id?: string;
           file_name?: string;
-          file_url?: string;
+          file_url?: string | null;
+          storage_path?: string | null;
           doc_type?: string | null;
+          issue_date?: string | null;
           expiry_date?: string | null;
+          file_size?: number | null;
+          mime_type?: string | null;
           uploaded_at?: string;
+        };
+        Relationships: [];
+      };
+      vault_shares: {
+        Row: {
+          id: string;
+          user_id: string;
+          token: string;
+          revoked: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          user_id: string;
+          token: string;
+          revoked?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          user_id?: string;
+          token?: string;
+          revoked?: boolean;
+          created_at?: string;
         };
         Relationships: [];
       };
@@ -210,6 +246,7 @@ export interface Database {
           message: string;
           sent_at: string;
           compliance_item_id: string | null;
+          document_id: string | null;
         };
         Insert: {
           id?: string;
@@ -218,6 +255,7 @@ export interface Database {
           message: string;
           sent_at?: string;
           compliance_item_id?: string | null;
+          document_id?: string | null;
         };
         Update: {
           id?: string;
@@ -226,6 +264,7 @@ export interface Database {
           message?: string;
           sent_at?: string;
           compliance_item_id?: string | null;
+          document_id?: string | null;
         };
         Relationships: [];
       };

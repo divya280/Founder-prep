@@ -11,6 +11,18 @@ export const dynamic = "force-dynamic";
 
 const VALID_STATUSES: ComplianceStatus[] = ["Not Started", "In Progress", "Done"];
 
+/** Strict YYYY-MM-DD check, and that it's a real calendar date. */
+function isDateString(value: unknown): value is string {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
+    return false;
+  }
+  const [y, m, d] = value.split("-").map(Number);
+  const dt = new Date(y, m - 1, d);
+  return (
+    dt.getFullYear() === y && dt.getMonth() === m - 1 && dt.getDate() === d
+  );
+}
+
 export async function PATCH(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> },
@@ -25,33 +37,57 @@ export async function PATCH(
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
 
-  let status: unknown;
+  let body: { status?: unknown; deadline?: unknown };
   try {
-    const body = (await request.json()) as { status?: unknown };
-    status = body.status;
+    body = (await request.json()) as { status?: unknown; deadline?: unknown };
   } catch {
     return NextResponse.json({ error: "Invalid body" }, { status: 400 });
   }
 
-  if (
-    typeof status !== "string" ||
-    !VALID_STATUSES.includes(status as ComplianceStatus)
-  ) {
+  const update: {
+    status?: ComplianceStatus;
+    completed_at?: string | null;
+    deadline?: string | null;
+  } = {};
+
+  if (body.status !== undefined) {
+    if (
+      typeof body.status !== "string" ||
+      !VALID_STATUSES.includes(body.status as ComplianceStatus)
+    ) {
+      return NextResponse.json(
+        { error: `status must be one of: ${VALID_STATUSES.join(", ")}` },
+        { status: 400 },
+      );
+    }
+    update.status = body.status as ComplianceStatus;
+    update.completed_at = body.status === "Done" ? new Date().toISOString() : null;
+  }
+
+  if (body.deadline !== undefined) {
+    // Accept a YYYY-MM-DD date string, or null to clear it.
+    if (body.deadline !== null && !isDateString(body.deadline)) {
+      return NextResponse.json(
+        { error: "deadline must be a YYYY-MM-DD string or null" },
+        { status: 400 },
+      );
+    }
+    update.deadline = body.deadline as string | null;
+  }
+
+  if (Object.keys(update).length === 0) {
     return NextResponse.json(
-      { error: `status must be one of: ${VALID_STATUSES.join(", ")}` },
+      { error: "Provide status and/or deadline" },
       { status: 400 },
     );
   }
 
   const { data, error } = await supabase
     .from("user_compliance")
-    .update({
-      status,
-      completed_at: status === "Done" ? new Date().toISOString() : null,
-    })
+    .update(update)
     .eq("id", id)
     .eq("user_id", user.id) // belt-and-suspenders alongside RLS
-    .select("id, status, completed_at")
+    .select("id, status, deadline, completed_at")
     .single();
 
   if (error) {

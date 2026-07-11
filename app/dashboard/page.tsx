@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { ChecklistView } from "@/components/compliance/ChecklistView";
+import { DashboardWidgets } from "@/components/dashboard/DashboardWidgets";
 import { LogoutButton } from "@/components/auth/LogoutButton";
 import { createClient } from "@/lib/supabase/server";
 import {
@@ -69,6 +70,18 @@ export default async function DashboardPage() {
           </span>
           <div className="flex items-center gap-4">
             <Link
+              href="/calendar"
+              className="text-sm font-medium text-[#427a5b] hover:underline"
+            >
+              Calendar
+            </Link>
+            <Link
+              href="/vault"
+              className="text-sm font-medium text-[#427a5b] hover:underline"
+            >
+              Vault
+            </Link>
+            <Link
               href="/assistant"
               className="text-sm font-medium text-[#427a5b] hover:underline"
             >
@@ -116,6 +129,8 @@ export default async function DashboardPage() {
               ))}
             </dl>
           </div>
+
+          <DashboardWidgets />
 
           <ChecklistView />
         </div>
