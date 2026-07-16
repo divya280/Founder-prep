@@ -1,10 +1,18 @@
 import { redirect } from "next/navigation";
 import { OnboardingForm } from "@/components/onboarding/OnboardingForm";
 import { createClient } from "@/lib/supabase/server";
-import type { OnboardingInput } from "@/lib/validations/onboarding";
+import {
+  isOnboardingComplete,
+  profileToOnboardingInitial,
+} from "@/lib/onboarding/profile";
 import type { UserProfile } from "@/types/user";
 
-export default async function OnboardingPage() {
+export default async function OnboardingPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ edit?: string }>;
+}) {
+  const { edit } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -22,23 +30,18 @@ export default async function OnboardingPage() {
     .single();
 
   const userProfile = profile as UserProfile | null;
+  const complete = isOnboardingComplete(userProfile);
 
-  // Already onboarded (business_type is the first thing set) → send to dashboard.
-  // The founder can still revisit later via an explicit "edit profile" action.
-  if (userProfile?.business_type) {
+  // Fully onboarded founders skip straight to the dashboard — unless they
+  // explicitly came to edit their profile (?edit=1 from the dashboard).
+  const isEdit = edit === "1" && complete;
+  if (complete && !isEdit) {
     redirect("/dashboard");
   }
 
-  // Pre-fill any fields already present so a resumed onboarding keeps its state.
-  const initial: Partial<OnboardingInput> = {};
-  if (userProfile?.domain) initial.domain = userProfile.domain as OnboardingInput["domain"];
-  if (userProfile?.state) initial.state = userProfile.state as OnboardingInput["state"];
-  if (userProfile?.team_size)
-    initial.team_size = userProfile.team_size as OnboardingInput["team_size"];
-  if (userProfile?.funding_stage)
-    initial.funding_stage = userProfile.funding_stage as OnboardingInput["funding_stage"];
-  if (userProfile?.revenue)
-    initial.revenue = userProfile.revenue as OnboardingInput["revenue"];
+  // Pre-fill every valid answered field so a resumed onboarding continues
+  // from where the founder left off instead of restarting at step 1.
+  const initial = profileToOnboardingInitial(userProfile);
 
   return (
     <main className="min-h-screen bg-[#f7f8f3] text-[#17201b]">
@@ -46,11 +49,23 @@ export default async function OnboardingPage() {
         <div className="mb-6">
           <span className="text-lg font-semibold tracking-wide">FounderPrep</span>
           <p className="mt-1 text-sm text-[#526057]">
-            A few quick questions so we can build your compliance roadmap.
+            {isEdit
+              ? "Update your founder profile. If anything changes, you can regenerate your checklist afterwards."
+              : "A few quick questions so we can build your compliance roadmap."}
           </p>
         </div>
 
-        <OnboardingForm userId={user.id} initial={initial} />
+        <OnboardingForm
+          userId={user.id}
+          email={user.email ?? ""}
+          name={
+            typeof user.user_metadata?.name === "string"
+              ? user.user_metadata.name
+              : ""
+          }
+          initial={initial}
+          mode={isEdit ? "edit" : "resume"}
+        />
       </section>
     </main>
   );

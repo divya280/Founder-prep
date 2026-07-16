@@ -4,6 +4,8 @@ import { useState } from "react";
 import type { VaultDocument } from "@/types/documents";
 import { DOC_TYPE_LABELS, formatFileSize, type DocType } from "@/lib/documents/options";
 import { EXPIRY_STYLES, expiryLabel, expiryStatus } from "@/lib/documents/expiry";
+import { useToast } from "@/components/ui/Toast";
+import { EmptyState } from "@/components/ui/EmptyState";
 
 // Grid of vault documents with download + (optionally) delete. Reused read-only
 // on the public /shared/<token> page, where onDeleted is omitted.
@@ -23,13 +25,12 @@ export function DocumentGrid({
   readOnly?: boolean;
 }) {
   const [deleting, setDeleting] = useState<string | null>(null);
-  const [error, setError] = useState("");
+  const { toast } = useToast();
 
   async function handleDelete(id: string) {
     if (deleting) return;
     if (!window.confirm("Delete this document? This cannot be undone.")) return;
     setDeleting(id);
-    setError("");
     try {
       const res = await fetch(`/api/documents/${id}`, { method: "DELETE" });
       if (!res.ok) {
@@ -37,8 +38,9 @@ export function DocumentGrid({
         throw new Error(data.error ?? "Could not delete");
       }
       onDeleted?.(id);
+      toast("Document deleted.", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Delete failed");
+      toast(err instanceof Error ? err.message : "Delete failed", "error");
     } finally {
       setDeleting(null);
     }
@@ -46,15 +48,21 @@ export function DocumentGrid({
 
   if (documents.length === 0) {
     return (
-      <p className="mt-4 text-sm text-[#5c6b61]">
-        No documents yet. {readOnly ? "" : "Upload one above to get started."}
-      </p>
+      <div className="mt-4">
+        <EmptyState
+          title="No documents yet"
+          description={
+            readOnly
+              ? "Nothing has been shared here yet."
+              : "Upload your incorporation certificate, PAN, GST, licenses and filings to keep them in one place."
+          }
+        />
+      </div>
     );
   }
 
   return (
     <div>
-      {error ? <p className="mb-3 text-sm text-red-600">{error}</p> : null}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {documents.map((doc) => {
           const status = expiryStatus(doc.expiry_date);

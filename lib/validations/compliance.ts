@@ -19,6 +19,8 @@ export const generatedChecklistItemSchema = z.object({
   necessity: z.enum(complianceNecessityValues),
   deadline_note: z.string().trim().max(300).default(""),
   penalty: z.string().trim().max(400).default(""),
+  responsible: z.string().trim().max(200).default(""),
+  documents_required: z.string().trim().max(600).default(""),
   // Lower = do sooner. Used to order the checklist.
   priority: z.coerce.number().int().min(1).max(100).default(50),
   // Which source doc grounded this item (filename from the retrieved chunks).

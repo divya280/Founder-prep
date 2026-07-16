@@ -34,7 +34,7 @@ async function loadChecklist(
   const { data, error } = await admin
     .from("user_compliance")
     .select(
-      "id, status, deadline, compliance_items ( id, name, category, description, how_to_apply, mandatory, domain_specific, penalty, deadline_note, created_at )",
+      "id, status, deadline, compliance_items ( id, name, category, description, how_to_apply, mandatory, domain_specific, penalty, deadline_note, responsible, documents_required, created_at )",
     )
     .eq("user_id", userId);
 
@@ -138,6 +138,8 @@ export async function POST() {
       domain_specific: /sector|licen[cs]e/i.test(it.category),
       penalty: it.penalty || null,
       deadline_note: it.deadline_note || null,
+      responsible: it.responsible || null,
+      documents_required: it.documents_required || null,
     }));
 
     const { data: upserted, error: itemsError } = await admin

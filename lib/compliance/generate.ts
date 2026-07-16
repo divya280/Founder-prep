@@ -32,6 +32,8 @@ Return a JSON object with this exact shape:
       "necessity": "mandatory | conditional | optional",
       "deadline_note": "typical statutory timeframe in words, or empty string",
       "penalty": "consequence of non-compliance from the context, or empty string",
+      "responsible": "who typically handles it (e.g. founder, CA, company secretary), or empty string",
+      "documents_required": "documents needed to apply, from the context, or empty string",
       "priority": 1-100 integer (lower = do sooner),
       "source": "source-filename.md"
     }

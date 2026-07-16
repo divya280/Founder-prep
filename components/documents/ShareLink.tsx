@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useToast } from "@/components/ui/Toast";
 
 // Read-only vault share link for a CA / co-founder. Fetches the current link,
 // lets the founder create, rotate, copy, or revoke it. Anyone with the link can
@@ -13,6 +14,7 @@ export function ShareLink() {
   const [busy, setBusy] = useState(false);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState("");
+  const { toast } = useToast();
 
   useEffect(() => {
     let active = true;
@@ -41,8 +43,11 @@ export function ShareLink() {
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error ?? "Failed");
       setUrl(method === "POST" ? (data.url ?? null) : null);
+      toast(method === "POST" ? "Share link ready." : "Sharing revoked.", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed");
+      const message = err instanceof Error ? err.message : "Failed";
+      setError(message);
+      toast(message, "error");
     } finally {
       setBusy(false);
     }
@@ -53,6 +58,7 @@ export function ShareLink() {
     try {
       await navigator.clipboard.writeText(url);
       setCopied(true);
+      toast("Link copied to clipboard.", "success");
       window.setTimeout(() => setCopied(false), 2000);
     } catch {
       setError("Could not copy — copy the link manually.");

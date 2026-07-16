@@ -12,6 +12,7 @@ import {
   FUNDING_STAGE_LABELS,
   REVENUE_LABELS,
 } from "@/lib/onboarding/options";
+import { isOnboardingComplete } from "@/lib/onboarding/profile";
 import type { UserProfile } from "@/types/user";
 
 // value → label lookup so the dashboard shows readable text, not stored keys.
@@ -24,7 +25,12 @@ function labelFor(
   return labels[value] ?? value;
 }
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ profileUpdated?: string }>;
+}) {
+  const { profileUpdated } = await searchParams;
   const supabase = await createClient();
 
   const {
@@ -43,9 +49,10 @@ export default async function DashboardPage() {
 
   const userProfile = profile as UserProfile | null;
 
-  // Not onboarded yet → collect the founder profile first. (Onboarding sends
-  // them back here once business_type is set, so this can't loop.)
-  if (!userProfile?.business_type) {
+  // Onboarding incomplete (never finished, or the row was created via another
+  // path) → resume it. Onboarding only sends founders back here once every
+  // field is set, so this can't loop.
+  if (!userProfile || !isOnboardingComplete(userProfile)) {
     redirect("/onboarding");
   }
 
@@ -64,11 +71,11 @@ export default async function DashboardPage() {
   return (
     <main className="min-h-screen bg-[#f7f8f3] text-[#17201b]">
       <section className="mx-auto flex min-h-screen w-full max-w-4xl flex-col px-6 py-8 sm:px-10">
-        <header className="flex items-center justify-between border-b border-[#d9ded4] pb-5">
+        <header className="flex flex-wrap items-center justify-between gap-y-3 border-b border-[#d9ded4] pb-5">
           <span className="text-lg font-semibold tracking-wide">
             FounderPrep
           </span>
-          <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
             <Link
               href="/calendar"
               className="text-sm font-medium text-[#427a5b] hover:underline"
@@ -107,7 +114,7 @@ export default async function DashboardPage() {
             <div className="flex items-center justify-between">
               <h2 className="text-lg font-semibold">Your profile</h2>
               <Link
-                href="/onboarding"
+                href="/onboarding?edit=1"
                 className="text-sm font-medium text-[#427a5b] hover:underline"
               >
                 Edit
@@ -132,7 +139,7 @@ export default async function DashboardPage() {
 
           <DashboardWidgets />
 
-          <ChecklistView />
+          <ChecklistView profileUpdated={profileUpdated === "1"} />
         </div>
       </section>
     </main>

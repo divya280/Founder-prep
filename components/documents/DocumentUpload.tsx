@@ -2,6 +2,7 @@
 
 import { useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { useToast } from "@/components/ui/Toast";
 import {
   DOC_TYPES,
   FILE_ACCEPT,
@@ -36,6 +37,7 @@ export function DocumentUpload({
   const [dragging, setDragging] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState("");
+  const { toast } = useToast();
 
   function validateAndSet(f: File) {
     setError("");
@@ -97,8 +99,11 @@ export function DocumentUpload({
 
       reset();
       onUploaded();
+      toast("Document uploaded.", "success");
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Upload failed");
+      const message = err instanceof Error ? err.message : "Upload failed";
+      setError(message);
+      toast(message, "error");
     } finally {
       setUploading(false);
     }

@@ -5,6 +5,7 @@ import type { VaultDocument } from "@/types/documents";
 import { DocumentUpload } from "./DocumentUpload";
 import { DocumentGrid } from "./DocumentGrid";
 import { ShareLink } from "./ShareLink";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 // Client orchestrator for the vault page: loads the document list and wires the
 // upload form, grid (with optimistic delete), and share panel to a single
@@ -51,7 +52,11 @@ export function VaultView({ userId }: { userId: string }) {
         {error ? (
           <p className="mt-4 text-sm text-red-600">{error}</p>
         ) : !documents ? (
-          <p className="mt-4 text-sm text-[#5c6b61]">Loading documents…</p>
+          <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }, (_, i) => (
+              <Skeleton key={i} className="h-40 rounded" />
+            ))}
+          </div>
         ) : (
           <DocumentGrid documents={documents} onDeleted={handleDeleted} />
         )}

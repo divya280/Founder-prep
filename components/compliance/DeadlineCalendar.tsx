@@ -9,6 +9,7 @@ import {
   urgencyOf,
   daysUntil,
 } from "@/lib/compliance/deadlines";
+import { Skeleton } from "@/components/ui/Skeleton";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 const MONTHS = [
@@ -85,7 +86,12 @@ export function DeadlineCalendar() {
     return <p className="text-sm text-red-600">{error}</p>;
   }
   if (!entries) {
-    return <p className="text-sm text-[#5c6b61]">Loading calendar…</p>;
+    return (
+      <div>
+        <Skeleton className="h-7 w-40 rounded" />
+        <Skeleton className="mt-4 h-80 w-full rounded" />
+      </div>
+    );
   }
 
   return (

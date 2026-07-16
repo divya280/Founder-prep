@@ -16,8 +16,18 @@ import type { OnboardingInput } from "@/lib/validations/onboarding";
 
 interface OnboardingFormProps {
   userId: string;
+  /** Auth email/name — used to (re)create the users row if it's missing. */
+  email: string;
+  name: string;
   /** Pre-fill if the founder is editing a partially-completed profile. */
   initial?: Partial<OnboardingInput>;
+  /**
+   * "resume" — first visit or unfinished profile: start at the first
+   * unanswered step and autosave each completed step so abandoning the form
+   * doesn't lose progress. "edit" — a fully-onboarded founder revising their
+   * profile from the dashboard: start at step 1, save only on Finish.
+   */
+  mode?: "resume" | "edit";
 }
 
 type FieldKey = keyof OnboardingInput;
@@ -57,10 +67,24 @@ const STEPS: Step[] = [
   },
 ];
 
-export function OnboardingForm({ userId, initial = {} }: OnboardingFormProps) {
+/** Index of the first step with an unanswered field (step 1 if all answered). */
+function firstIncompleteStep(data: Partial<OnboardingInput>): number {
+  const index = STEPS.findIndex((s) => s.fields.some((f) => !data[f]));
+  return index === -1 ? 0 : index;
+}
+
+export function OnboardingForm({
+  userId,
+  email,
+  name,
+  initial = {},
+  mode = "resume",
+}: OnboardingFormProps) {
   const router = useRouter();
 
-  const [step, setStep] = useState(0);
+  const [step, setStep] = useState(() =>
+    mode === "edit" ? 0 : firstIncompleteStep(initial),
+  );
   const [data, setData] = useState<Partial<OnboardingInput>>(initial);
   const [errors, setErrors] = useState<Partial<Record<FieldKey, string>>>({});
   const [formError, setFormError] = useState("");
@@ -91,8 +115,44 @@ export function OnboardingForm({ userId, initial = {} }: OnboardingFormProps) {
     return Object.keys(stepErrors).length === 0;
   }
 
+  // Persist profile fields. Update-first; if no row came back the signup
+  // trigger never created one (UPDATE matches zero rows and "succeeds", which
+  // used to loop founders back to onboarding forever) — self-heal by inserting
+  // the row, which the "Users insert own row" RLS policy permits.
+  async function persistProfile(
+    fields: Partial<Record<FieldKey, string>>,
+  ): Promise<boolean> {
+    const supabase = createClient();
+    const { data: updated, error } = await supabase
+      .from("users")
+      .update(fields)
+      .eq("id", userId)
+      .select("id");
+    if (error) return false;
+    if (updated && updated.length > 0) return true;
+
+    const { error: insertError } = await supabase
+      .from("users")
+      .insert({ id: userId, email, name, ...fields });
+    return !insertError;
+  }
+
+  // Best-effort autosave of the current step's answers, so a founder who
+  // abandons onboarding partway resumes here next login instead of at step 1.
+  // Failures are ignored — the Finish save is the authoritative write.
+  async function saveStepFields() {
+    const partial: Partial<Record<FieldKey, string>> = {};
+    for (const field of current.fields) {
+      const value = data[field];
+      if (value) partial[field] = value;
+    }
+    if (Object.keys(partial).length === 0) return;
+    await persistProfile(partial);
+  }
+
   function handleNext() {
     if (!validateStep()) return;
+    if (mode === "resume") void saveStepFields();
     setStep((s) => Math.min(s + 1, STEPS.length - 1));
   }
 
@@ -105,18 +165,25 @@ export function OnboardingForm({ userId, initial = {} }: OnboardingFormProps) {
     if (!validateStep()) return;
 
     const parsed = onboardingSchema.safeParse(data);
-    if (!parsed.success) return;
+    if (!parsed.success) {
+      // A field from an earlier step is missing/invalid — say so instead of
+      // silently doing nothing, and jump back to the offending step.
+      const badField = parsed.error.issues[0]?.path[0];
+      const badStep = STEPS.findIndex((s) =>
+        s.fields.includes(badField as FieldKey),
+      );
+      setFormError(
+        "Some answers are missing. Please review the highlighted steps.",
+      );
+      if (badStep >= 0) setStep(badStep);
+      return;
+    }
 
     setFormError("");
     setLoading(true);
 
-    const supabase = createClient();
-    const { error } = await supabase
-      .from("users")
-      .update(parsed.data)
-      .eq("id", userId);
-
-    if (error) {
+    const saved = await persistProfile(parsed.data);
+    if (!saved) {
       setFormError(
         "We couldn't save your profile. Please try again in a moment.",
       );
@@ -124,7 +191,15 @@ export function OnboardingForm({ userId, initial = {} }: OnboardingFormProps) {
       return;
     }
 
-    router.push("/dashboard");
+    // On an edited profile, flag the change so the dashboard can prompt an
+    // explicit checklist regeneration (never regenerate silently).
+    const changed =
+      mode === "edit" &&
+      (Object.keys(parsed.data) as FieldKey[]).some(
+        (key) => parsed.data[key] !== initial[key],
+      );
+
+    router.push(changed ? "/dashboard?profileUpdated=1" : "/dashboard");
     router.refresh();
   }
 
@@ -221,7 +296,11 @@ export function OnboardingForm({ userId, initial = {} }: OnboardingFormProps) {
             disabled={loading}
             className="bg-[#427a5b] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#356549] disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {loading ? "Saving..." : "Finish & view dashboard"}
+            {loading
+              ? "Saving..."
+              : mode === "edit"
+                ? "Save changes"
+                : "Finish & view dashboard"}
           </button>
         ) : (
           <button

@@ -10,6 +10,8 @@ export interface ComplianceItem {
   domain_specific: boolean;
   penalty: string | null;
   deadline_note: string | null;
+  responsible: string | null;
+  documents_required: string | null;
   created_at: string;
 }
 

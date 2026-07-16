@@ -60,6 +60,8 @@ export interface Database {
           domain_specific: boolean;
           penalty: string | null;
           deadline_note: string | null;
+          responsible: string | null;
+          documents_required: string | null;
           created_at: string;
         };
         Insert: {
@@ -72,6 +74,8 @@ export interface Database {
           domain_specific?: boolean;
           penalty?: string | null;
           deadline_note?: string | null;
+          responsible?: string | null;
+          documents_required?: string | null;
           created_at?: string;
         };
         Update: {
@@ -84,6 +88,8 @@ export interface Database {
           domain_specific?: boolean;
           penalty?: string | null;
           deadline_note?: string | null;
+          responsible?: string | null;
+          documents_required?: string | null;
           created_at?: string;
         };
         Relationships: [];

@@ -3,6 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ChecklistEntry, ComplianceStatus } from "@/types/compliance";
 import { urgencyOf, daysUntil, URGENCY_STYLES } from "@/lib/compliance/deadlines";
+import { useToast } from "@/components/ui/Toast";
+import { SkeletonList } from "@/components/ui/Skeleton";
+import { EmptyState } from "@/components/ui/EmptyState";
+import { ItemDetailModal } from "@/components/compliance/ItemDetailModal";
 
 const STATUSES: ComplianceStatus[] = ["Not Started", "In Progress", "Done"];
 
@@ -17,13 +21,21 @@ type Filter = "All" | ComplianceStatus;
 const FALLBACK_DISCLAIMER =
   "This checklist is AI-generated guidance based on official sources — not a substitute for advice from a qualified CA or lawyer.";
 
-export function ChecklistView() {
+interface ChecklistViewProps {
+  /** True right after the founder edited their profile — prompts an explicit
+   *  regenerate instead of silently rebuilding the checklist. */
+  profileUpdated?: boolean;
+}
+
+export function ChecklistView({ profileUpdated = false }: ChecklistViewProps) {
   const [entries, setEntries] = useState<ChecklistEntry[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState("");
   const [filter, setFilter] = useState<Filter>("All");
   const [disclaimer, setDisclaimer] = useState<string | null>(null);
+  const [detailId, setDetailId] = useState<string | null>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     let active = true;
@@ -45,6 +57,17 @@ export function ChecklistView() {
   }, []);
 
   const generate = useCallback(async () => {
+    // Regenerating an existing checklist is explicit, never silent: confirm
+    // first. Statuses and deadlines survive (the API only adds missing links).
+    if (
+      entries &&
+      entries.length > 0 &&
+      !window.confirm(
+        "Regenerate your checklist from your current profile? Your existing statuses and deadlines are kept; new items may be added.",
+      )
+    ) {
+      return;
+    }
     setGenerating(true);
     setError("");
     try {
@@ -53,12 +76,18 @@ export function ChecklistView() {
       if (!res.ok) throw new Error(data.error ?? "Generation failed");
       setEntries(data.checklist ?? []);
       setDisclaimer(data.disclaimer ?? null);
+      toast(
+        `Roadmap ready — ${data.checklist?.length ?? 0} items.`,
+        "success",
+      );
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Generation failed");
+      const message = err instanceof Error ? err.message : "Generation failed";
+      setError(message);
+      toast(message, "error");
     } finally {
       setGenerating(false);
     }
-  }, []);
+  }, [entries, toast]);
 
   const updateStatus = useCallback(
     async (id: string, status: ComplianceStatus) => {
@@ -80,10 +109,10 @@ export function ChecklistView() {
         if (!res.ok) throw new Error();
       } catch {
         setEntries(prev); // revert
-        setError("Could not update status. Please try again.");
+        toast("Could not update status. Please try again.", "error");
       }
     },
-    [entries],
+    [entries, toast],
   );
 
   const updateDeadline = useCallback(
@@ -105,10 +134,10 @@ export function ChecklistView() {
         if (!res.ok) throw new Error();
       } catch {
         setEntries(prev);
-        setError("Could not update deadline. Please try again.");
+        toast("Could not update deadline. Please try again.", "error");
       }
     },
-    [entries],
+    [entries, toast],
   );
 
   const counts = useMemo(() => {
@@ -123,28 +152,33 @@ export function ChecklistView() {
   );
 
   if (loading) {
-    return <div className="mt-10 text-sm text-[#5c6b61]">Loading your checklist…</div>;
+    return (
+      <div className="mt-10">
+        <SkeletonList count={3} />
+      </div>
+    );
   }
 
   // Empty state — offer to generate.
   if (!entries || entries.length === 0) {
     return (
-      <div className="mt-10 border border-[#d9ded4] bg-white p-8 text-center shadow-sm">
-        <h2 className="text-lg font-semibold">Your compliance roadmap</h2>
-        <p className="mx-auto mt-2 max-w-md text-sm text-[#526057]">
-          Generate a personalized checklist of the registrations, filings and
-          licenses your business needs — grounded in official Indian compliance
-          sources.
-        </p>
-        {error ? <p className="mt-4 text-sm text-red-600">{error}</p> : null}
-        <button
-          type="button"
-          onClick={generate}
-          disabled={generating}
-          className="mt-6 bg-[#427a5b] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#356549] disabled:cursor-not-allowed disabled:opacity-60"
+      <div className="mt-10">
+        <EmptyState
+          title="Your compliance roadmap"
+          description="Generate a personalized checklist of the registrations, filings and licenses your business needs — grounded in official Indian compliance sources."
         >
-          {generating ? "Generating…" : "Generate my roadmap"}
-        </button>
+          {error ? (
+            <p className="mb-4 text-sm text-red-600">{error}</p>
+          ) : null}
+          <button
+            type="button"
+            onClick={generate}
+            disabled={generating}
+            className="bg-[#427a5b] px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-[#356549] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {generating ? "Generating…" : "Generate my roadmap"}
+          </button>
+        </EmptyState>
       </div>
     );
   }
@@ -153,8 +187,23 @@ export function ChecklistView() {
   const total = counts.All;
   const pct = total > 0 ? Math.round((doneCount / total) * 100) : 0;
 
+  // Resolve from current entries so the modal reflects live status changes.
+  const detailEntry =
+    entries.find((e) => e.userComplianceId === detailId) ?? null;
+
   return (
     <div className="mt-10">
+      {profileUpdated ? (
+        <div className="mb-5 border border-[#c9a53a]/40 bg-[#c9a53a]/10 p-4 text-sm text-[#8a6d16]">
+          <p className="font-medium">Your profile has changed.</p>
+          <p className="mt-1">
+            This checklist still reflects your previous profile. Use
+            &ldquo;Regenerate&rdquo; to refresh it — your existing statuses and
+            deadlines will be kept.
+          </p>
+        </div>
+      ) : null}
+
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="text-lg font-semibold">Your compliance roadmap</h2>
         <button
@@ -211,6 +260,7 @@ export function ChecklistView() {
             entry={entry}
             onStatusChange={updateStatus}
             onDeadlineChange={updateDeadline}
+            onOpenDetail={setDetailId}
           />
         ))}
       </div>
@@ -218,6 +268,10 @@ export function ChecklistView() {
       <p className="mt-8 text-xs leading-5 text-[#8a978c]">
         {disclaimer ?? FALLBACK_DISCLAIMER}
       </p>
+
+      {detailEntry ? (
+        <ItemDetailModal entry={detailEntry} onClose={() => setDetailId(null)} />
+      ) : null}
     </div>
   );
 }
@@ -226,10 +280,12 @@ function ChecklistCard({
   entry,
   onStatusChange,
   onDeadlineChange,
+  onOpenDetail,
 }: {
   entry: ChecklistEntry;
   onStatusChange: (id: string, status: ComplianceStatus) => void;
   onDeadlineChange: (id: string, deadline: string | null) => void;
+  onOpenDetail: (id: string) => void;
 }) {
   const { item, status, deadline } = entry;
   const urgency = deadline ? urgencyOf(deadline) : null;
@@ -239,7 +295,14 @@ function ChecklistCard({
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="text-base font-semibold">{item.name}</h3>
+            <button
+              type="button"
+              onClick={() => onOpenDetail(entry.userComplianceId)}
+              className="text-left text-base font-semibold hover:text-[#427a5b] hover:underline"
+              aria-label={`View details for ${item.name}`}
+            >
+              <h3>{item.name}</h3>
+            </button>
             <span className="border border-[#d9ded4] px-2 py-0.5 text-[11px] font-medium text-[#5c6b61]">
               {item.category}
             </span>
